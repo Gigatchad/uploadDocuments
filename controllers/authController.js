@@ -6,14 +6,14 @@ const firebaseAuthUrl = `https://identitytoolkit.googleapis.com/v1/accounts:sign
 const firebaseAuthUrlcode = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${process.env.FIREBASE_API_KEY}`; 
 // Fonction pour connecter l'admin
 const loginAdmin = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, fcmToken } = req.body;  // Ajouter fcmToken dans la requête
 
   try {
-    // Authentification via l'API Firebase Authentication REST
+    // Authentification via Firebase Authentication REST
     const response = await axios.post(firebaseAuthUrl, {
       email,
       password,
-      returnSecureToken: true, // Obtenir un token
+      returnSecureToken: true,  // Obtenir un token
     });
 
     const idToken = response.data.idToken; // Token Firebase
@@ -21,6 +21,7 @@ const loginAdmin = async (req, res) => {
     // Vérifier les claims du token JWT (rôle admin, email vérifié)
     const decodedToken = await admin.auth().verifyIdToken(idToken);
 
+    // Vérification que l'utilisateur est un admin
     if (decodedToken.role !== 'admin') {
       return res.status(403).json({ message: 'Accès refusé : utilisateur non administrateur' });
     }
@@ -29,7 +30,10 @@ const loginAdmin = async (req, res) => {
       return res.status(403).json({ message: 'Accès refusé : email non vérifié' });
     }
 
-    // Envoi de la réponse avec le token et les informations utilisateur
+    // Enregistrer le token FCM dans Firestore
+    await saveFCMToken(decodedToken.uid, fcmToken);  // Enregistrer le token FCM dans Firestore
+
+    // Répondre avec le token et les informations de l'admin
     res.status(200).json({
       message: 'Connexion réussie',
       uid: decodedToken.uid,
@@ -277,14 +281,14 @@ const deleteUser = async (req, res) => {
   }
 };
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, fcmToken } = req.body;  // Ajouter fcmToken dans la requête
 
   try {
-    // Authentification via l'API Firebase Authentication REST
+    // Authentification via Firebase Authentication REST
     const response = await axios.post(firebaseAuthUrl, {
       email,
       password,
-      returnSecureToken: true, // Obtenir un token
+      returnSecureToken: true,  // Obtenir un token
     });
 
     const idToken = response.data.idToken; // Token Firebase
@@ -301,11 +305,14 @@ const loginUser = async (req, res) => {
 
     const userData = userDoc.data();
 
-    // Retourner le rôle de l'utilisateur et d'autres informations nécessaires
+    // Enregistrer le token FCM de l'utilisateur dans Firestore
+    await saveFCMToken(decodedToken.uid, fcmToken);  // Enregistrer le token FCM
+
+    // Retourner les informations de l'utilisateur
     res.status(200).json({
       message: 'Connexion réussie',
       uid: decodedToken.uid,
-      role: userData.role,  // Seul le rôle est retourné
+      role: userData.role,  // Retourner le rôle de l'utilisateur
       email: userData.email,
       token: idToken,        // Inclure le token pour les futures requêtes sécurisées
     });
@@ -347,6 +354,16 @@ const resetPassword = async (req, res) => {
   } catch (error) {
     console.error('Erreur lors de la réinitialisation du mot de passe', error);
     res.status(500).json({ message: "Une erreur est survenue lors de la réinitialisation du mot de passe." });
+  }
+};
+const saveFCMToken = async (userId, token) => {
+  try {
+    const userRef = db.collection('users').doc(userId);  // Utilise l'ID de l'utilisateur pour accéder à son document
+    await userRef.update({
+      fcmToken: token,  // Enregistre ou met à jour le token FCM dans Firestore
+    });
+  } catch (error) {
+    console.error('Erreur lors de l\'enregistrement du token FCM', error);
   }
 };
 

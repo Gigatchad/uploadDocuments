@@ -1,13 +1,12 @@
 const express = require('express');
-const { uploadDocument } = require('../controllers/documentController');
-const fileUpload = require('express-fileupload'); // Middleware pour gérer les uploads de fichiers
-
+const { submitDocumentRequest,uploadDocumentAndUpdateRequest,updateRequestStatus,getUserRequests,getAllRequests ,searchUserRequests} = require('../controllers/documentController');  // Importer le contrôleur
 const router = express.Router();
 
-// Middleware pour gérer les fichiers
-router.use(fileUpload());
-
-// Route d'upload des documents
-router.post('/upload', uploadDocument);
-
+// Route pour soumettre une demande de document
+router.post('/submit', submitDocumentRequest);
+router.post('/upload/:requestId', uploadDocumentAndUpdateRequest);
+router.put('/updateStatus/:requestId', updateRequestStatus);
+router.get('/getRequests', getUserRequests);
+router.get('/getAllRequests', getAllRequests);
+router.get('/searchRequests', searchUserRequests);
 module.exports = router;
